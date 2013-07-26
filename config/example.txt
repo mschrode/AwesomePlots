@@ -1,0 +1,249 @@
+# $Id: example.txt,v 1.7 2013/06/17 15:17:06 mschrode Exp $
+#
+### Example config file
+#
+# MrRA2 is a configurable tool to produce control plots and print event
+# yields and information for different selections of data from ROOT trees.
+#
+# This is an example configuration file explaining the various options to
+# MrRA2. The file runs on the input files prefixed with 'Example' residing
+# in 'ResultProcessor/input'. (Event-cleaning and preselection criteria have
+# been applied to these samples, among others: HT > 500 GeV, MHT > 200 GeV,
+# NJets >=2. Keep this in mind when looking at the example distributions
+# produced with this config.)
+#
+# The general syntax is '<key> :: <name>: <value>[; <name>: <value>; ...]'.
+# Sometimes, values can be comma-separated lists of values.
+# The following characters are used as separators and may in general not be
+# used in keys, names, or values: '+', ',', ':', ';'. Spaces should be safe.
+# Lines starting with an '#' and empty lines are ignored.
+#
+# The tool runs on any ROOT tree containing basic variable types (except booleans).
+# It has been developed, though, for application in a SUSY search (RA2), which
+# is reflected in the plotting options.
+
+
+
+### Global parameters
+# All global parameters are optional
+
+# Publication status <internal,preliminary,public> defines the plotting
+# style. For example, in case of 'preliminary' the header contains
+# "CMS Preliminary". The default status in 'internal'. 
+global :: publication status: internal
+# Luminosity in 1/fb; used to label plots, i.e. there is no weighting
+# functionality etc. (Note that I did not write down the correct lumi
+# here, so don't try to search for SUSY in these samples...)
+global :: lumi: 1
+# The input path is preprended to the input file names defined below
+# in the dataset section. 
+global :: input path: input
+# Output file-names are prefixed with 'id'
+global :: id: Example
+# Comma-separated list of output formats. The supported formats are
+# pdf, png, and eps. Default is pdf.
+global :: output formats: pdf, png
+
+
+
+### Variables
+# The variables that are read from the ntuple and their type. Each line
+# with key 'variable' defines a new variable.
+#
+# The mandatory names are:
+# - name: variable's name in the ROOT tree
+# - type: ROOT-like variable type. Supported are
+#     - Double_t,
+#     - Float_t,
+#     - UShort_t,
+#     - Int_t,
+#     - UInt_t,
+#     - UChar_t
+#
+# Optionally, a TLatex-style label and a unit used in the plots can
+# be defined, e.g. '#eta_{1}'.
+variable :: name: RunNum; type: UInt_t
+variable :: name: LumiBlockNum; type: UInt_t
+variable :: name: EvtNum; type: UInt_t
+variable :: name: HT; type: Float_t; label: H_{T}; unit: GeV
+variable :: name: MHT; type: Float_t; label: #slash{H}_{T}; unit: GeV
+variable :: name: NJets; type: UShort_t; label: N(Jets)
+variable :: name: NVtx; type: UShort_t; label: N(Vtx)
+variable :: name: Jet1Pt; type: Float_t; label: p_{T,1}; unit: GeV
+variable :: name: Jet2Pt; type: Float_t; label: p_{T,2}; unit: GeV
+variable :: name: Jet3Pt; type: Float_t; label: p_{T,3}; unit: GeV
+variable :: name: Weight; type: Float_t
+
+
+
+### Input datasets
+# The input trees, dataset specifications, and optional weights and uncertainties.
+# Each line with key 'dataset' defines a new dataset.
+#
+# The mandatory names are:
+# - label: a unique label for this dataset. The label is used to identify the dataset
+#          in other config definitions and as part of the output file names. It will
+#          also be printed in plot labels, where TLatex-style syntax is correctly
+#          interpreted, but for the ease of the config file language (you don't want
+#          to type 'Z#rightarrow#nu#bar{#nu}' several times in this config file!),
+#          the printed dataset label can optionally be defined (see below 'plot style').
+# - type: type of data which defines the plotting style. The types are
+#         - data
+#         - mc
+#         - mcprediction (for mc-based background prediction)
+#         - prediction (for data-based background prediction)
+#         - signal (for simulated signal processes)
+# - files: list of names of the ROOT files containing the trees. If 'input path' is specified under
+#         'global', the input path is prepended.
+# - tree: name of the TTree inside the file. If this dataset contains several input files, each
+#         needs to have the same tree name.
+#
+# Optional names are:
+# - weight: name of a tree variable (as specified above) used as an event weight.
+# - scales: list of constant event weights (numbers). If 'weight' is specified, the scale is
+#           multiplied to the weight. There can be either one scale applied to all events in all
+#           files of this dataset or n scales, where n equals the number of files in this dataset
+#           and the i-th scale factor is applied to the events in the i-th file.  
+dataset :: label: Data; type: data; files: Example_Data.root; tree: RA2TreeMaker/RA2PreSelection;
+dataset :: label: TTbar; type: mc; files: Example_TTJets.root; tree: RA2TreeMaker/RA2PreSelection; weight: Weight
+dataset :: label: QCD; type: mc; files: Example_QCD1.root, Example_QCD2.root; tree: RA2TreeMaker/RA2PreSelection; weight: Weight;
+dataset :: label: ZJets; type: mc; files: Example_ZJets.root; tree: RA2TreeMaker/RA2PreSelection; weight: Weight
+dataset :: label: WJets; type: mc; files: Example_WJets.root; tree: RA2TreeMaker/RA2PreSelection; weight: Weight
+dataset :: label: Signal; type: signal; files: Example_Signal.root; tree: RA2TreeMaker/RA2PreSelection; weight: Weight; scales: 0.001
+
+
+
+### Event selection
+# Event selections based on the variables defined above. Each line with key
+# 'selection' defines a new selection; plots and event yields are produced
+# for each selection individually.
+#
+# The mandatory names are:
+# - label: unique label used to reference the selection in this config file,
+#          to name the output files, and as labels in plots (TLatex-style
+#          expressions are correctly interpreted).
+# - cuts: series of cuts and previously defined selections. Cuts are of the
+#         form 'VAR OP X', 'X OP VAR', or 'X1 OP VAR OP X2', where VAR is any
+#         of the variables defined above, OP is any of the comparison operators
+#         '>,>=,<,<=,==,!=', and X is a number. (Care should be taken with the
+#         the equality operator '==' due to possible rounding issues. It should
+#         be safe to use for any integer-type variable.) Cuts and previously
+#         defined selections can be combined to a boolean expression using 
+#         c++-style boolean operators '&&' (AND), '||' (OR), and '!' (NOT), where
+#         parentheses can be used. (Ordering of && and || is not implemented, i.e.
+#         the behaviour of an expression 'A && B || C' is not well defined. Use
+#         parentheses to define the order!)
+#
+# Optional parameters are:
+# - apply to: list of dataset names. If given, the selection will be applied only
+#             to the specified datasets. This is also true if the selection is
+#             reused in a later selection, i.e. if selection A is to be applied
+#             only to certain datasets, this restriction remains if A is part of
+#             selection B, but only for the cuts of A.
+# - print: print the selection details.
+selection :: label: cleaned; cuts: !(RunNum == 191721 && EvtNum == 50909073) && !(RunNum==190782 && EvtNum == 369785661)
+selection :: label: njets; cuts: cleaned && 5 <= NJets <= 7
+selection :: label: highHT; cuts: cleaned && HT > 600
+selection :: print: true
+
+
+
+### Plots
+# Various different plot types are implemented to plot distributions of the
+# defined variables. Each line defines a new plot. Each plot is produced for all
+# defined selections.
+#
+# The following applies to all plot types:
+# - Each plot definition requires a name 'histogram' that defines the histogram's
+#   dimensions and options such as logarithmic scales or normed distributions. The
+#   syntax is derived from the TH1 constructors and is either
+#   - 'histogram: <NBins>, <Min>, <Max>, [logx,logy,norm]' or
+#   - 'histogram: <NBinsX>, <XMin>, <XMax>, <NBinsY>, <YMin>, <YMax>, [logx,logy,logz,norm]'
+#   for 1D or 2D histograms, respectively, where the first 3 or 6 values, respectively, 
+#   define the binning and are mandatory. The additional values are optional and, if given
+#   set log scales and normalised (to area 1) histograms.
+# - The datasets to be plotted are given as
+#   - single label: plots the distribution only for this dataset.
+#   - ','-separated list of labels: plots the distributions of all listed datasets 
+#                   superimposed (TH1::Draw() option "same").
+#   - '+'-separated list of labels: plots the distributions of all listed datasets
+#                   as a stack (similar to THStack).
+#
+# There are different plot types as explained in the following. They take different
+# additional names.
+#
+# A single distribution (1D histogram) of one variable.
+# - variable: the plotted variable
+# - dataset: label of the dataset for which the distribution is plotted
+# The mandatory names (in addition to 'histogram' as explained above) are
+plot :: variable: HT; dataset: Data; histogram: 17, 500, 2200, logy
+plot :: variable: MHT; dataset: Data; histogram:  16, 200, 1000, logy
+plot :: variable: HT; dataset: TTbar; histogram: 17, 500, 2200, logy
+#
+# Stacked distributions (1D histograms) of several datasets.
+# The mandatory names (in addition to 'histogram' as explained above) are
+# - variable: the plotted variable
+# - dataset: list of dataset labels, separated by '+' for which the 
+#            distributions are plotted and stacked.
+plot :: variable: HT; dataset: QCD + TTbar + ZJets + WJets; histogram: 17, 500, 2200, logy
+plot :: variable: NJets; dataset: QCD + TTbar + ZJets + WJets; histogram: 10, 2.5, 12.5, logy
+plot :: variable: NVtx; dataset: QCD + TTbar + WJets + ZJets; histogram: 50, 0, 50
+#
+# A 2D distribution.
+# The mandatory names (in addition to 'histogram' as explained above) are
+# - variable: the plotted variables, separated by ' vs ', as 'Y vs X'
+# - dataset: label of the dataset for which the distribution is plotted
+plot :: variable: MHT vs HT; dataset: Data; histogram:  17, 500, 2200, 16, 200, 1000, logz
+#
+# Superimposed distributions of one variable for several datasets.
+# The mandatory names (in addition to 'histogram' as explained above) are
+# - variable: the plotted variable
+# - dataset: comma-separated list of dataset labels 
+plot :: variable: NVtx; dataset: Data, QCD, TTbar, WJets, ZJets; histogram: 50, 0, 50, norm
+#
+# "Data-vs-background" plot of one variable. A single distribution from one dataset
+# (that would be the data in a data-vs-bkg plot) is compared to the stack of several
+# distributions from several datasets (that would be the background processes). A ratio plot
+# is drawn at the bottom of the canvas. Optionally, several single distributions can be
+# superimposed (which can be used to display possible signal processes).
+# The mandatory names (in addition to 'histogram' as explained above) are
+# - variable: the plotted variable
+# - data: label of the data-like dataset
+# - background: '+'-separated list of the background-like datasets
+# Optional names are
+# - signals: comma-separated list of signal-like datasets
+plot :: variable: HT; data: Data; background: QCD + TTbar + ZJets + WJets; signals: Signal; histogram: 17, 500, 2200, logy
+plot :: variable: MHT; data: Data; background: QCD + TTbar + ZJets + WJets; signals: Signal; histogram: 16, 200, 1000, logy
+plot :: variable: NJets; data: Data; background: QCD + TTbar + ZJets + WJets; signals: Signal; histogram: 10, 2.5, 12.5, logy
+plot :: variable: Jet1Pt; data: Data; background: QCD + TTbar + ZJets + WJets; signals: Signal; histogram: 24, 0, 1200, logy
+plot :: variable: Jet2Pt; data: Data; background: QCD + TTbar + ZJets + WJets; signals: Signal; histogram: 24, 0, 1200, logy
+plot :: variable: Jet3Pt; data: Data; background: QCD + TTbar + ZJets + WJets; signals: Signal; histogram: 24, 0, 1200, logy
+
+
+
+### Optional: dataset- or selection-specific plotting styles
+# Each line defines the settings for one dataset or one selection
+#
+# If specified, there is one mandatory name
+# - plot yields: show yields in legend (default is 'true')
+# - dataset: dataset label; such a line defines styles for datasets
+# - selection: selection label; such a line defines styles for selections
+# 
+# Then, there are several optional names defining style parameters.
+# (They do not apply to all mandatory names, but do not harm either.):
+# - plot label: dataset label to be used in the plot legends. This is intended for
+#               complicated labels, e.g. Z#rightarrow#nu#bar{#nu} that you don't
+#               want to have to type several times in this config file. TLatex-style
+#               syntax is understood.
+# - marker: TMarker style for the plot markers - an integer
+# - color: color index for the marker, line, and fill colors. Can be an integer or
+#          the TColor mnemonics, e.g. 'kRed'.
+style :: plot yields: false
+style :: dataset: Data; plot label: Data; marker: 20; color: 1
+style :: dataset: TTbar; plot label: t#bar{t}; color: kRed+1
+style :: dataset: QCD; plot label: QCD; color: kRed+3
+style :: dataset: ZJets; plot label: Z#rightarrow#nu#bar{#nu}+Jets; color: kYellow
+style :: dataset: WJets; plot label: W#rightarrowl#nu+Jets; color: kGreen+1
+style :: dataset: Signal; plot label: Signal; color: kBlue
+style :: selection: highHT; plot label: high-H_{T}
+style :: selection: njets; plot label: 5 #leq N_{jets} #leq 7
