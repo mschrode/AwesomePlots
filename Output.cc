@@ -8,22 +8,6 @@
 Output::Output() {
 }
 
-void Output::addPlot(TCanvas* can, const TString &var, const TString &selection) {
-  TString plotName = cleanName(GlobalParameters::analysisId()+"__"+var+"__"+selection);
-  
-  std::map< TString, std::vector<TString> >::iterator itVar = plotsNormedSpectra_.begin();
-  if( itVar != plotsNormedSpectra_.end() ) {
-    itVar->second.push_back(plotName);
-  } else {
-    std::vector<TString> v;
-    v.push_back(plotName);
-    plotsNormedSpectra_[var] = v;
-  }
-
-  storeCanvas(can,selection,plotName);
-}
-
-
 void Output::addPlot(TCanvas* can, const TString &var, const TString &dataSetLabel, const TString &selection) {
 
   TString dsLabel  = cleanName(dataSetLabel);
@@ -50,14 +34,15 @@ void Output::addPlot(TCanvas* can, const TString &var, const TString &dataSetLab
   storeCanvas(can,selection,plotName);
 }
 
-void Output::addPlot(TCanvas* can, const TString &var, const std::vector<TString> &dataSetLabels, const TString &selection) {
+
+void Output::addPlot(TCanvas* can, const TString &var, const std::vector<TString> &dataSetLabels, const TString &plotType, const TString &selection) {
   TString label = dataSetLabels.front();
   for(std::vector<TString>::const_iterator it = dataSetLabels.begin()+1;
       it != dataSetLabels.end(); ++it) {
     label += "+"+*it;
   }
   TString dsLabel  = cleanName(label);
-  TString plotName = cleanName(GlobalParameters::analysisId()+"__"+var+"__"+dsLabel+"__"+selection);
+  TString plotName = cleanName(GlobalParameters::analysisId()+"__"+var+"__"+dsLabel+"-"+plotType+"__"+selection);
 
   std::map< TString, std::map< TString, std::vector<TString> > >::iterator itVar = plotsStack_.find(var);
   if( itVar != plotsStack_.end() ) {

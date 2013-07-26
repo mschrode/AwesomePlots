@@ -45,10 +45,13 @@ void PlotBuilder::run(const Config &cfg, const TString &key) const {
       //// Parse variables
       std::vector<TString> variables;
       if( it->value("variable").Contains(" vs ") ) {
+	// This is a 2D plot; split into variable names
 	Config::split(it->value("variable")," vs ",variables);
 	plotDim = "2D";
       } else {
+	// A 1D plot
 	variables.push_back(it->value("variable"));
+	plotDim = "1D";
       }
       for(std::vector<TString>::const_iterator itv = variables.begin();
 	  itv != variables.end(); ++itv) {
@@ -68,23 +71,34 @@ void PlotBuilder::run(const Config &cfg, const TString &key) const {
 
 
       //// Make plots
-      // Specified datasets; defines the type of plot
+      // Read type of plot
       if( it->hasName("dataset") ) {
-	if( it->value("dataset").Contains(",") )      plotType = "ComparedDistributions";
-	else if( it->value("dataset").Contains("+") ) plotType = "StackedDistributions";
-	else                                          plotType = "SingleDistribution";
+
+	if( it->value("dataset").Contains("+") ) { // Case of several datasets
+	  // Set default for case of several defined datasets
+	  plotType = "ComparedDistributions";
+	  // Check for specifics
+	  if( it->hasName("type") ) {
+	    if     ( it->value("type") == "overlay"   )  plotType = "ComparedDistributions";
+	    else if( it->value("type") == "stack"     )  plotType = "StackedDistributions";
+	    else if( it->value("type") == "fractions" )  plotType = "FractionalDistributions";
+	  }
+
+	} else {		// Case of one dataset
+
+	  plotType = "SingleDistribution";
+
+	}
 
 	// Read dataset(s)
 	std::vector<TString> dataSetLabels;
-	if( plotType == "ComparedDistributions" ) {
-	  Config::split(it->value("dataset"),",",dataSetLabels);
-	} else if( plotType == "StackedDistributions" ) {
-	  Config::split(it->value("dataset"),"+",dataSetLabels);
-	} else {
+	if( plotType == "SingleDistribution" ) {
 	  dataSetLabels.push_back(it->value("dataset"));
+	} else {
+	  Config::split(it->value("dataset"),"+",dataSetLabels);
 	}
 
-	// Check whether datasets exist
+	// Check whether dataset(s) exist
 	for(std::vector<TString>::const_iterator itd = dataSetLabels.begin();
 	    itd != dataSetLabels.end(); ++itd) {
  	  if( !DataSet::labelExists(*itd) ) {
@@ -93,7 +107,7 @@ void PlotBuilder::run(const Config &cfg, const TString &key) const {
  	  }
 	}
 
-	// For each selection, get the datasets and make the plots
+	// For each selection, get the dataset(s) and make the plots
 	for(SelectionIt its = Selection::begin(); its != Selection::end(); ++its) {
 	  DataSets dataSets;
 	  for(std::vector<TString>::const_iterator itd = dataSetLabels.begin();
@@ -107,6 +121,8 @@ void PlotBuilder::run(const Config &cfg, const TString &key) const {
 	      plotStackedDistributions(variables.front(),dataSets,histParams);
 	    } else if( plotType == "ComparedDistributions" ) {
 	      plotComparedDistributions(variables.front(),dataSets,histParams);
+	    } else if( plotType == "FractionalDistributions" ) {
+	      plotFractionalDistributions(variables.front(),dataSets,histParams);
 	    }
 	  } else if( plotDim == "2D" ) {
 	    plotDistribution2D(variables.at(1),variables.at(0),dataSets.front(),histParams);
@@ -123,7 +139,7 @@ void PlotBuilder::run(const Config &cfg, const TString &key) const {
 	std::vector<TString> signalLabels;
 	Config::split(it->value("background"),"+",bkgLabels);
 	if( it->hasName("signals") ) {
-	  Config::split(it->value("signals"),",",signalLabels);
+	  Config::split(it->value("signals"),"+",signalLabels);
 	}
 
 	// Check whether datasets exist
@@ -287,7 +303,7 @@ void PlotBuilder::plotComparedDistributions(const TString &var, const DataSets &
   gPad->RedrawAxis();
   if( histParams.logx() ) can->SetLogx();
   if( histParams.logy() ) can->SetLogy();
-  storeCanvas(can,var,dataSets.front()->selectionUid());
+  storeCanvas(can,var,dataSets,"overlayed");
   
   delete title;
   delete leg;
@@ -331,7 +347,7 @@ void PlotBuilder::plotStackedDistributions(const TString &var, const DataSets &d
   gPad->RedrawAxis();
   if( histParams.logx() ) can->SetLogx();
   if( histParams.logy() ) can->SetLogy();
-  storeCanvas(can,var,dataSets);
+  storeCanvas(can,var,dataSets,"stack");
 
   for(std::vector<TH1*>::iterator it = hists.begin();
       it != hists.end(); ++it) {
@@ -339,6 +355,77 @@ void PlotBuilder::plotStackedDistributions(const TString &var, const DataSets &d
   }
   if( unc ) delete unc;
   delete leg;
+  delete title;
+  delete can;
+}
+
+
+// Plot stacked distributions where each bin is normalized to 1
+void PlotBuilder::plotFractionalDistributions(const TString &var, const DataSets &dataSets, const HistParams &histParams) const {
+  // Create stack
+  std::vector<TH1*> hists;
+  std::vector<TString> legEntries;
+  TGraphAsymmErrors* unc = 0;
+  createStack1D(dataSets,var,hists,legEntries,unc,histParams);
+  if( unc ) delete unc;		// No uncertainty band so far
+
+  // Norm each bin to 1
+  for(int bin = 1; bin <= hists.front()->GetNbinsX(); ++bin) {
+    // First histogram in stack in sum of all datasets
+    // It's bin content is norm
+    double norm = hists.front()->GetBinContent(bin);
+    // Loop over all histograms and normalize bin content
+    if( norm > 0. ) {
+      for(std::vector<TH1*>::iterator it = hists.begin();
+	  it != hists.end(); ++it) {
+	(*it)->SetBinContent( bin, (*it)->GetBinContent(bin) / norm );
+      }
+    }    
+  }
+
+  // Create legends and labels
+  unsigned int nEntriesRight = hists.size()/2;
+  unsigned int nEntriesLeft  = hists.size() - nEntriesRight;
+  TLegend* legL = legendLeft(nEntriesLeft);
+  TLegend* legR = legendRight(nEntriesRight);
+  unsigned int entry = 0;
+  for(; entry < nEntriesLeft; ++entry) {
+    legL->AddEntry(hists.at(entry),legEntries.at(entry),"F");
+  }
+  for(; entry < hists.size(); ++entry) {
+    legR->AddEntry(hists.at(entry),legEntries.at(entry),"F");
+  }
+  TPaveText* title = header(dataSets,true,Style::tlatexLabel(dataSets.front()->selectionUid()));
+
+  // Axis range (so far only for linear scale)
+  double relHistHeight = 1 - gStyle->GetPadBottomMargin() - gStyle->GetPadTopMargin();
+  double relLegHeight  = 0.06*nEntriesLeft; // Should be retrieved from legend, but ROOT sucks...
+  hists.front()->GetYaxis()->SetRangeUser(0.,1.1 + relLegHeight/relHistHeight);
+
+  // Set y title
+  hists.front()->GetYaxis()->SetTitle("Fractional Contribution");
+
+  // draw
+  TCanvas* can = new TCanvas("can","",canSize_,canSize_);
+  can->cd();
+  hists.front()->Draw("HIST");
+  for(std::vector<TH1*>::iterator it = hists.begin()+1;
+      it != hists.end(); ++it) {
+    (*it)->Draw("HISTsame");
+  }
+  title->Draw("same");
+  legL->Draw("same");
+  legR->Draw("same");
+  if( histParams.logx() ) can->SetLogx();
+  gPad->RedrawAxis();
+  storeCanvas(can,var,dataSets,"fractions");
+
+  for(std::vector<TH1*>::iterator it = hists.begin();
+      it != hists.end(); ++it) {
+    delete *it;
+  }
+  delete legL;
+  delete legR;
   delete title;
   delete can;
 }
@@ -731,7 +818,9 @@ void PlotBuilder::createDistributionRatio(const DataSet *dataSet, const TString 
 }
 
 
-
+// Fills vector with stack of histograms
+// First histogram is sum of all datasets
+// Last histogram is only first dataset
 void PlotBuilder::createStack1D(const DataSets &dataSets, const TString &var, std::vector<TH1*> &hists, std::vector<TString> &legEntries, TGraphAsymmErrors* &uncert, const HistParams &histParams) const {
   uncert = 0;
   for(DataSetRIt itd = dataSets.rbegin();
@@ -771,19 +860,15 @@ void PlotBuilder::createStack1D(const DataSets &dataSets, const TString &var, st
 
 
 void PlotBuilder::storeCanvas(TCanvas* can, const TString &var, const DataSet* dataSet) const {
-    out_.addPlot(can,var,dataSet->label(),dataSet->selectionUid());
-  }
+  out_.addPlot(can,var,dataSet->label(),dataSet->selectionUid());
+}
 
-void PlotBuilder::storeCanvas(TCanvas* can, const TString &var, const TString &selection) const {
-    out_.addPlot(can,var,selection);
-  }
-
-void PlotBuilder::storeCanvas(TCanvas* can, const TString &var, const DataSets &dataSets) const {
-    std::vector<TString> dataSetLabels;
+void PlotBuilder::storeCanvas(TCanvas* can, const TString &var, const DataSets &dataSets, const TString &plotType) const {
+  std::vector<TString> dataSetLabels;
     for(DataSetIt itd = dataSets.begin(); itd != dataSets.end(); ++itd) {
       dataSetLabels.push_back((*itd)->label());
     }
-    out_.addPlot(can,var,dataSetLabels,dataSets.front()->selectionUid());
+    out_.addPlot(can,var,dataSetLabels,plotType,dataSets.front()->selectionUid());
   }
 
 void PlotBuilder::storeCanvas(TCanvas* can, const TString &var, const DataSet *dataSet, const DataSets &dataSets) const {
@@ -972,6 +1057,29 @@ TLegend* PlotBuilder::legend(unsigned int nEntries) const {
     x0 = 0.45;
   }
   double x1 = 1.-gStyle->GetPadRightMargin()-margin;
+  double y1 = 1.-gStyle->GetPadTopMargin()-margin;
+  double y0 = y1-nEntries*lineHeight;
+
+  TLegend* leg = new TLegend(x0,y0,x1,y1);
+  leg->SetBorderSize(0);
+  leg->SetFillColor(0);
+  leg->SetFillStyle(0);
+  leg->SetTextFont(42);
+  leg->SetTextSize(0.04);
+
+  return leg;
+}
+
+
+TLegend* PlotBuilder::legendCol(unsigned int nEntries, bool left) const {
+  double lineHeight = 0.06;
+  double margin = 0.02;
+
+  // Left and right canvas border
+  double x0 = gStyle->GetPadLeftMargin()+margin;
+  double x1 = 1.-gStyle->GetPadRightMargin()-margin;
+  if( left ) x1 = x0 + (x1-x0)/2. - margin;
+  else       x0 = x0 + (x1-x0)/2. + margin;
   double y1 = 1.-gStyle->GetPadTopMargin()-margin;
   double y0 = y1-nEntries*lineHeight;
 

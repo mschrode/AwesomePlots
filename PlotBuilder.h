@@ -64,6 +64,7 @@ private:
   void plotDistribution(const TString &var, const DataSet *dataSet, const HistParams &histParams) const;
   void plotDistribution2D(const TString &var1, const TString &var2, const DataSet *dataSet, const HistParams &histParams) const;
   void plotStackedDistributions(const TString &var, const DataSets &dataSets, const HistParams &histParams) const;
+  void plotFractionalDistributions(const TString &var, const DataSets &dataSets, const HistParams &histParams) const;
   void plotComparedDistributions(const TString &var, const DataSets &dataSets, const HistParams &histParams) const;
   void plotDataVsBkg(const TString &var, const DataSet *data, const DataSets &bkgs, const DataSets &signals, const HistParams &histParams) const;
   void createDistribution1D(const DataSet *dataSet, const TString &var, TH1* &h, TGraphAsymmErrors* &uncert, const HistParams &histParams) const;
@@ -72,8 +73,7 @@ private:
   void createStack1D(const DataSets &dataSets, const TString &var, std::vector<TH1*> &hists, std::vector<TString> &legEntries, TGraphAsymmErrors* &uncert, const HistParams &histParams) const;
 
   void storeCanvas(TCanvas* can, const TString &var, const DataSet* dataSet) const;
-  void storeCanvas(TCanvas* can, const TString &var, const TString &selection) const;
-  void storeCanvas(TCanvas* can, const TString &var, const DataSets &dataSets) const;
+  void storeCanvas(TCanvas* can, const TString &var, const DataSets &dataSets, const TString &plotType) const;
   void storeCanvas(TCanvas* can, const TString &var, const DataSet* dataSet, const DataSets &dataSets) const;
 
   int color(const DataSet *dataSet) const;
@@ -87,6 +87,9 @@ private:
   TPaveText* header(const DataSets &ds, bool isSimulation, bool showLumi, const TString &info = "") const;
   TPaveText* header(bool isSimulation, bool showLumi, const TString &info = "") const;
   TLegend* legend(unsigned int nEntries) const;
+  TLegend* legendLeft(unsigned int nEntries) const { return legendCol(nEntries,true); }
+  TLegend* legendRight(unsigned int nEntries) const { return legendCol(nEntries,false); }
+  TLegend* legendCol(unsigned int nEntries, bool left) const;
   TString lumiLabel() const;
   TString dataSetLegEntry(const TH1* h, const DataSet* ds) const;
   void setYRange(TH1* &h, double logMin = -1.) const;

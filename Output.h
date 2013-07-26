@@ -24,9 +24,8 @@ public:
   Output();
   ~Output() {};
 
-  void addPlot(TCanvas* can, const TString &var, const TString &selection);
   void addPlot(TCanvas* can, const TString &var, const TString &dataSetLabel, const TString &selection);
-  void addPlot(TCanvas* can, const TString &var, const std::vector<TString> &dataSetLabels, const TString &selection);
+  void addPlot(TCanvas* can, const TString &var, const std::vector<TString> &dataSetLabels, const TString &plotType, const TString &selection);
   void addPlot(TCanvas* can, const TString &var, const std::vector<TString> &dataSetLabels1, const std::vector<TString> &dataSetLabels2, const TString &selection);
 
   void createLaTeXSlide() const;
